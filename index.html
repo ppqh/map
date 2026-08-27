@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>地図ツール</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Kiwi+Maru&display=swap" rel="stylesheet">
+
+    <!-- ===== Leaflet（地図ライブラリ） ===== -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #1e1e2f;
+            font-family: 'Kiwi Maru', 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem 1rem;
+        }
+        .container {
+            background: #2d2d44;
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 800px;
+            color: #eee;
+        }
+        h1 {
+            font-family: 'Mochiy Pop One', sans-serif;
+            font-size: 1.8rem;
+            color: #ffb3c6;
+            letter-spacing: 2px;
+            margin-bottom: 0.25rem;
+        }
+        .sub {
+            color: #ccc;
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* ===== 地図 ===== */
+        #map {
+            height: 350px;
+            border-radius: 12px;
+            border: 2px solid #444;
+            margin-bottom: 1rem;
+        }
+
+        /* ===== コントロール ===== */
+        .control-row {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .control-row input {
+            flex: 1;
+            min-width: 120px;
+            background: #1e1e32;
+            border: 2px solid #444;
+            padding: 0.6rem 1rem;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 0.9rem;
+            font-family: 'Kiwi Maru', sans-serif;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .control-row input:focus { border-color: #ffb3c6; }
+        .control-row input::placeholder { color: #666; }
+        .control-row button {
+            background: #ffb3c6;
+            color: #1e1e2f;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-family: 'Mochiy Pop One', sans-serif;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .control-row button:hover { background: #ff8fab; }
+
+        /* ===== 情報表示 ===== */
+        .info-box {
+            background: #1e1e32;
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid #444;
+            font-size: 0.9rem;
+            line-height: 1.8;
+            margin-top: 0.5rem;
+        }
+        .info-box .label {
+            color: #888;
+            font-size: 0.7rem;
+            font-family: 'Mochiy Pop One', sans-serif;
+            letter-spacing: 1px;
+        }
+        .info-box .value {
+            color: #ddd;
+            word-break: break-all;
+        }
+        .info-box .value .highlight {
+            color: #ffb3c6;
+            font-weight: bold;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 0.75rem;
+        }
+        .btn-row button {
+            background: #555;
+            color: #eee;
+            border: none;
+            padding: 0.4rem 1rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-family: 'Mochiy Pop One', sans-serif;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-row button:hover { background: #666; }
+
+        .footer {
+            margin-top: 1.5rem;
+            font-size: 0.75rem;
+            color: #555;
+            text-align: center;
+        }
+        .footer a {
+            color: #ffb3c6;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #1e1e2f;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 480px) {
+            .container { padding: 1.5rem; }
+            h1 { font-size: 1.4rem; }
+            .control-row { flex-direction: column; }
+            .control-row button { width: 100%; }
+            #map { height: 250px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>地図ツール</h1>
+        <p class="sub">現在地表示・住所検索・緯度経度変換</p>
+
+        <!-- ===== 地図 ===== -->
+        <div id="map"></div>
+
+        <!-- ===== コントロール ===== -->
+        <div class="control-row">
+            <input type="text" id="addressInput" placeholder="住所を入力（例: 東京タワー）" />
+            <button id="searchBtn">住所検索</button>
+            <button id="currentBtn">現在地</button>
+        </div>
+
+        <div class="control-row">
+            <input type="text" id="latInput" placeholder="緯度（例: 35.6586）" />
+            <input type="text" id="lngInput" placeholder="経度（例: 139.7454）" />
+            <button id="coordBtn">緯度経度で移動</button>
+        </div>
+
+        <!-- ===== 情報表示 ===== -->
+        <div class="info-box" id="infoBox">
+            <div><span class="label">📍 現在地</span></div>
+            <div class="value" id="coordDisplay">緯度: -- / 経度: --</div>
+            <div class="value" id="addressDisplay">住所: --</div>
+            <div style="font-size:0.7rem;color:#555;margin-top:0.3rem;">
+                ※ 地図をクリックするとその場所の情報を取得
+            </div>
+        </div>
+
+        <div class="btn-row">
+            <button id="copyCoordBtn">緯度経度をコピー</button>
+            <button id="copyAddressBtn">住所をコピー</button>
+            <button id="resetBtn">リセット</button>
+        </div>
+
+        <div class="footer">
+            <a href="https://99399.github.io/" target="_blank">ツール一覧に戻る</a>
+            &nbsp;·&nbsp; OpenStreetMap 使用
+        </div>
+    </div>
+
+    <script>
+        // ================================================================
+        // ★★★ 地図初期化 ★★★
+        // ================================================================
+        const map = L.map('map').setView([35.6812, 139.7671], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        let marker = null;
+        let currentLat = 35.6812;
+        let currentLng = 139.7671;
+        let currentAddress = '';
+
+        // ================================================================
+        // ★★★ マーカー更新 ★★★
+        // ================================================================
+        function updateMarker(lat, lng, address) {
+            if (marker) {
+                marker.setLatLng([lat, lng]);
+            } else {
+                marker = L.marker([lat, lng]).addTo(map);
+            }
+            map.setView([lat, lng], 15);
+            currentLat = lat;
+            currentLng = lng;
+            currentAddress = address || '';
+
+            document.getElementById('coordDisplay').innerHTML =
+                '緯度: <span class="highlight">' + lat.toFixed(6) + '</span> / 経度: <span class="highlight">' + lng.toFixed(6) + '</span>';
+
+            if (address) {
+                document.getElementById('addressDisplay').innerHTML =
+                    '住所: <span class="highlight">' + address + '</span>';
+            } else {
+                document.getElementById('addressDisplay').innerHTML = '住所: --';
+            }
+        }
+
+        // ================================================================
+        // ★★★ 住所→緯度経度（Geocoding） ★★★
+        // ================================================================
+        async function searchAddress(address) {
+            if (!address.trim()) {
+                alert('住所を入力してください');
+                return;
+            }
+
+            document.getElementById('searchBtn').innerHTML = '<span class="spinner"></span> 検索中...';
+            document.getElementById('searchBtn').disabled = true;
+
+            try {
+                const url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(address) + '&countrycodes=jp&limit=1';
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.length === 0) {
+                    alert('住所が見つかりませんでした');
+                    return;
+                }
+
+                const lat = parseFloat(data[0].lat);
+                const lng = parseFloat(data[0].lon);
+                const displayName = data[0].display_name;
+
+                updateMarker(lat, lng, displayName);
+                document.getElementById('addressInput').value = displayName;
+
+            } catch (error) {
+                alert('検索エラー: ' + error.message);
+            } finally {
+                document.getElementById('searchBtn').innerHTML = '住所検索';
+                document.getElementById('searchBtn').disabled = false;
+            }
+        }
+
+        // ================================================================
+        // ★★★ 現在地取得 ★★★
+        // ================================================================
+        function getCurrentLocation() {
+            if (!navigator.geolocation) {
+                alert('このブラウザは位置情報に対応していません');
+                return;
+            }
+
+            document.getElementById('currentBtn').innerHTML = '<span class="spinner"></span> 取得中...';
+            document.getElementById('currentBtn').disabled = true;
+
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    updateMarker(lat, lng, '');
+
+                    // 逆ジオコーディングで住所取得
+                    try {
+                        const url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng;
+                        const response = await fetch(url);
+                        const data = await response.json();
+                        if (data.display_name) {
+                            currentAddress = data.display_name;
+                            document.getElementById('addressDisplay').innerHTML =
+                                '住所: <span class="highlight">' + data.display_name + '</span>';
+                        }
+                    } catch {}
+
+                    document.getElementById('currentBtn').innerHTML = '現在地';
+                    document.getElementById('currentBtn').disabled = false;
+                },
+                (error) => {
+                    alert('位置情報を取得できませんでした: ' + error.message);
+                    document.getElementById('currentBtn').innerHTML = '現在地';
+                    document.getElementById('currentBtn').disabled = false;
+                }
+            );
+        }
+
+        // ================================================================
+        // ★★★ 緯度経度から住所（Reverse Geocoding） ★★★
+        // ================================================================
+        async function reverseGeocode(lat, lng) {
+            try {
+                const url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng;
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.display_name) {
+                    currentAddress = data.display_name;
+                    document.getElementById('addressDisplay').innerHTML =
+                        '住所: <span class="highlight">' + data.display_name + '</span>';
+                    document.getElementById('addressInput').value = data.display_name;
+                }
+                return data.display_name || '';
+            } catch {
+                return '';
+            }
+        }
+
+        // ================================================================
+        // ★★★ 緯度経度で移動 ★★★
+        // ================================================================
+        async function moveToCoordinates() {
+            const lat = parseFloat(document.getElementById('latInput').value.trim());
+            const lng = parseFloat(document.getElementById('lngInput').value.trim());
+
+            if (isNaN(lat) || isNaN(lng)) {
+                alert('有効な緯度・経度を入力してください');
+                return;
+            }
+
+            if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                alert('緯度は-90〜90、経度は-180〜180の範囲で入力してください');
+                return;
+            }
+
+            document.getElementById('coordBtn').innerHTML = '<span class="spinner"></span> 取得中...';
+            document.getElementById('coordBtn').disabled = true;
+
+            updateMarker(lat, lng, '');
+            const address = await reverseGeocode(lat, lng);
+
+            document.getElementById('coordBtn').innerHTML = '緯度経度で移動';
+            document.getElementById('coordBtn').disabled = false;
+        }
+
+        // ================================================================
+        // ★★★ コピー機能 ★★★
+        // ================================================================
+        function copyCoord() {
+            const text = currentLat + ', ' + currentLng;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('緯度経度をコピーしました！\n' + text);
+            });
+        }
+
+        function copyAddress() {
+            if (!currentAddress) {
+                alert('住所がありません');
+                return;
+            }
+            navigator.clipboard.writeText(currentAddress).then(() => {
+                alert('住所をコピーしました！');
+            });
+        }
+
+        // ================================================================
+        // ★★★ リセット ★★★
+        // ================================================================
+        function resetMap() {
+            map.setView([35.6812, 139.7671], 13);
+            if (marker) {
+                marker.setLatLng([35.6812, 139.7671]);
+            }
+            currentLat = 35.6812;
+            currentLng = 139.7671;
+            currentAddress = '';
+            document.getElementById('coordDisplay').innerHTML = '緯度: -- / 経度: --';
+            document.getElementById('addressDisplay').innerHTML = '住所: --';
+            document.getElementById('addressInput').value = '';
+            document.getElementById('latInput').value = '';
+            document.getElementById('lngInput').value = '';
+        }
+
+        // ================================================================
+        // ★★★ 地図クリック ★★★
+        // ================================================================
+        map.on('click', async (e) => {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            updateMarker(lat, lng, '');
+            const address = await reverseGeocode(lat, lng);
+            if (address) {
+                document.getElementById('addressDisplay').innerHTML =
+                    '住所: <span class="highlight">' + address + '</span>';
+            }
+            document.getElementById('latInput').value = lat.toFixed(6);
+            document.getElementById('lngInput').value = lng.toFixed(6);
+        });
+
+        // ================================================================
+        // ★★★ イベント ★★★
+        // ================================================================
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            searchAddress(document.getElementById('addressInput').value);
+        });
+
+        document.getElementById('currentBtn').addEventListener('click', getCurrentLocation);
+
+        document.getElementById('coordBtn').addEventListener('click', moveToCoordinates);
+
+        document.getElementById('copyCoordBtn').addEventListener('click', copyCoord);
+
+        document.getElementById('copyAddressBtn').addEventListener('click', copyAddress);
+
+        document.getElementById('resetBtn').addEventListener('click', resetMap);
+
+        // Enterキー対応
+        document.getElementById('addressInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('searchBtn').click();
+        });
+        document.getElementById('latInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('coordBtn').click();
+        });
+        document.getElementById('lngInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('coordBtn').click();
+        });
+
+        // ================================================================
+        // ★★★ 初期マーカー（東京） ★★★
+        // ================================================================
+        updateMarker(35.6812, 139.7671, '');
+    </script>
+
+</body>
+</html>
